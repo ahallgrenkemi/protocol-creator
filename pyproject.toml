@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aurora-method-builder"
+version = "0.1.0"
+description = "desktop editor for cycling protocols and palmsens methodscript"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "PySide6",
+    "aurora-unicycler @ git+https://github.com/Laswer5/aurora-unicycler.git@b50252c79e8c314d79d7b73630af800d23adad26",
+]
+
+[project.gui-scripts]
+aurora-method-builder = "aurora_method_builder.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

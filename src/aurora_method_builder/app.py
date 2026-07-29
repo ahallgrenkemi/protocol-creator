@@ -4,9 +4,6 @@ import json
 import sys
 from pathlib import Path
 
-if __package__ in {None, ""}:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication,
@@ -23,22 +20,22 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.app_style import APP_STYLESHEET
-from src.aurora_app.aurora_builder import (
+from .style import APP_STYLESHEET
+from .builder import (
     AuroraVisualBuilder,
     visual_steps_from_protocol_data,
 )
-from src.aurora_app.aurora_methodscript_export_dialog import (
+from .export_dialog import (
     AuroraMethodScriptExportDialog,
 )
-from src.aurora_app.aurora_methods import (
+from .methods import (
     AuroraMethodPackage,
     build_aurora_package,
     load_aurora_package,
     render_aurora_package,
     validate_aurora_methodscript_export,
 )
-from src.widgets import NoScrollComboBox
+from .widgets import NoScrollComboBox
 
 
 class AuroraMethodEditor(QWidget):

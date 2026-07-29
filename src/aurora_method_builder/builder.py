@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.widgets import NoScrollComboBox
+from .widgets import NoScrollComboBox
 
 Parser = Callable[[Any], Any]
 SummaryBuilder = Callable[[dict[str, Any]], str]
