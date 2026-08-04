@@ -12,6 +12,7 @@ from aurora_unicycler.palmsens import PalmSensDevice
 
 PACKAGE_FORMAT = "palmsens_aurora_method_package"
 PACKAGE_VERSION = 2
+SUPPORTED_SOURCE_MODES = frozenset({"aurora_visual", "aurora_json"})
 
 
 AURORA_DEVICE_OPTIONS = (
@@ -91,9 +92,12 @@ class AuroraMethodPackage:
             raise ValueError("Unsupported Aurora package format.")
         if data.get("version") != PACKAGE_VERSION:
             raise ValueError("Unsupported Aurora package version.")
+        source_mode = data.get("source_mode", "aurora_visual")
+        if source_mode not in SUPPORTED_SOURCE_MODES:
+            raise ValueError(f"Unsupported Aurora source mode: {source_mode}")
         return cls(
             name=data.get("name", "Aurora Method"),
-            source_mode=data.get("source_mode", "aurora_visual"),
+            source_mode=source_mode,
             source_payload=data.get("source_payload", {}),
             protocol_json=data.get("protocol_json", {}),
         )
@@ -144,50 +148,16 @@ def build_aurora_protocol(source_mode: str, source_payload: dict[str, Any] | str
             raise ValueError("Aurora visual payload must be a dictionary.")
         return build_protocol_from_visual_data(source_payload)
 
+    if source_mode != "aurora_json":
+        raise ValueError(f"Unsupported Aurora source mode: {source_mode}")
     if not isinstance(source_payload, str) or not source_payload.strip():
         raise ValueError("Aurora source text is required.")
 
-    if source_mode == "aurora_json":
-        try:
-            protocol_data = json.loads(source_payload)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"Invalid Aurora JSON: {exc.msg}") from exc
-        return aurora_unicycler.CyclingProtocol.from_dict(protocol_data)
-
-    if source_mode == "aurora_python":
-        execution_scope = {
-            "__builtins__": __builtins__,
-            "CyclingProtocol": aurora_unicycler.CyclingProtocol,
-            "ConstantCurrent": aurora_unicycler.ConstantCurrent,
-            "ConstantVoltage": aurora_unicycler.ConstantVoltage,
-            "ImpedanceSpectroscopy": aurora_unicycler.ImpedanceSpectroscopy,
-            "Loop": aurora_unicycler.Loop,
-            "OpenCircuitVoltage": aurora_unicycler.OpenCircuitVoltage,
-            "PalmSensDevice": PalmSensDevice,
-            "RecordParams": aurora_unicycler.RecordParams,
-            "SafetyParams": aurora_unicycler.SafetyParams,
-            "SampleParams": aurora_unicycler.SampleParams,
-            "Tag": aurora_unicycler.Tag,
-            "Temperature": Temperature,
-            "VoltageScan": aurora_unicycler.VoltageScan,
-            "Wait": aurora_unicycler.Wait,
-        }
-        exec(source_payload, execution_scope, execution_scope)
-        protocol = execution_scope.get("protocol")
-        if protocol is None:
-            build_protocol_fn = execution_scope.get("build_protocol")
-            if callable(build_protocol_fn):
-                protocol = build_protocol_fn()
-        if protocol is None:
-            raise ValueError(
-                "Aurora Python scripts must define `protocol = CyclingProtocol(...)` "
-                "or `build_protocol()`."
-            )
-        if not isinstance(protocol, aurora_unicycler.CyclingProtocol):
-            raise ValueError("Aurora Python script did not produce a CyclingProtocol.")
-        return protocol
-
-    raise ValueError(f"Unsupported Aurora source mode: {source_mode}")
+    try:
+        protocol_data = json.loads(source_payload)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid Aurora JSON: {exc.msg}") from exc
+    return aurora_unicycler.CyclingProtocol.from_dict(protocol_data)
 
 
 def build_aurora_methodscript(

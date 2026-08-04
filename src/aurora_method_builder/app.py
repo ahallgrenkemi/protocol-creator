@@ -59,7 +59,6 @@ class AuroraMethodEditor(QWidget):
         self.run_mode_combo = NoScrollComboBox(self)
         self.run_mode_combo.addItem("Aurora Visual Builder", "aurora_visual")
         self.run_mode_combo.addItem("Aurora Unicycler JSON", "aurora_json")
-        self.run_mode_combo.addItem("Aurora Unicycler Python", "aurora_python")
         self.header_form.addRow("Mode", self.run_mode_combo)
 
         self.script_help = QLabel(self)
@@ -92,16 +91,9 @@ class AuroraMethodEditor(QWidget):
 
         if run_mode == "aurora_json" and not self.script_editor.toPlainText().strip():
             self.script_editor.setPlainText(self.default_aurora_json())
-        elif run_mode == "aurora_python" and not self.script_editor.toPlainText().strip():
-            self.script_editor.setPlainText(self.default_aurora_python())
 
         if run_mode == "aurora_json":
             self.script_help.setText("Edit an Aurora Unicycler protocol JSON object.")
-        elif run_mode == "aurora_python":
-            self.script_help.setText(
-                "Edit a Python script that defines `protocol = CyclingProtocol(...)` "
-                "or `build_protocol()`."
-            )
 
     def source_payload(self) -> dict | str:
         if self.selected_run_mode() == "aurora_visual":
@@ -285,23 +277,6 @@ class AuroraMethodEditor(QWidget):
             },
             indent=2,
         )
-
-    @staticmethod
-    def default_aurora_python() -> str:
-        return """protocol = CyclingProtocol(
-    record=RecordParams(time_s=10, voltage_V=0.01),
-    safety=SafetyParams(max_voltage_V=4.3, min_voltage_V=2.5),
-    method=[
-        Tag(tag="cycle"),
-        OpenCircuitVoltage(until_time_s=600),
-        ConstantCurrent(rate_C=0.5, until_voltage_V=4.2, until_time_s=3 * 60 * 60),
-        ConstantVoltage(voltage_V=4.2, until_rate_C=0.05, until_time_s=60 * 60),
-        ConstantCurrent(rate_C=-0.5, until_voltage_V=3.0, until_time_s=3 * 60 * 60),
-        Loop(loop_to="cycle", cycle_count=10),
-    ],
-)
-"""
-
 
 class AuroraMethodBuilderWindow(QMainWindow):
     def __init__(self):
