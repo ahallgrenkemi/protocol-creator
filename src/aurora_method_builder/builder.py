@@ -79,13 +79,6 @@ def parse_optional_c_rate(raw_value: Any) -> float | None:
     return _coerce_c_rate(value) if value else None
 
 
-def parse_current_direction(raw_value: Any) -> str:
-    value = _as_text(raw_value)
-    if value not in {"charging", "discharging"}:
-        raise ValueError("Current direction must be charging or discharging.")
-    return value
-
-
 def parse_bool(raw_value: Any) -> bool:
     if isinstance(raw_value, bool):
         return raw_value
@@ -352,19 +345,35 @@ def _summary_from_parts(*parts: str) -> str:
 
 
 def _current_step_target_summary(params: dict[str, Any]) -> str:
-    if params.get("rate_C"):
+    if params.get("rate_C") not in (None, ""):
         return f"{params['rate_C']} C"
-    if params.get("current_mA"):
+    if params.get("current_mA") not in (None, ""):
         return _display_value(params, "current_mA", "mA")
     return ""
+
+
+def _current_step_direction_summary(params: dict[str, Any]) -> str:
+    raw_value = params.get("rate_C")
+    parser = parse_optional_c_rate
+    if raw_value in {None, ""}:
+        raw_value = params.get("current_mA")
+        parser = parse_optional_float
+
+    try:
+        value = parser(raw_value)
+    except (TypeError, ValueError):
+        return ""
+
+    if value is None or value == 0:
+        return ""
+    return "Charging" if value > 0 else "Discharging"
 
 
 def _constant_current_summary(params: dict[str, Any]) -> str:
     target = _current_step_target_summary(params)
     if not target:
         return ""
-    direction = params.get("current_direction", "charging").capitalize()
-    return _summary_from_parts(direction, target)
+    return _summary_from_parts(_current_step_direction_summary(params), target)
 
 
 def _display_value(params: dict[str, Any], key: str, default_unit: str) -> str:
@@ -381,16 +390,6 @@ def _temperature_wait_summary(params: dict[str, Any]) -> str:
     if params.get("wait_start") == "step_start":
         return f"wait {duration} from step start"
     return f"wait {duration}"
-
-
-def _build_constant_current(params: dict[str, Any]) -> aurora_unicycler.ConstantCurrent:
-    values = dict(params)
-    direction = values.pop("current_direction")
-    sign = -1 if direction == "discharging" else 1
-    for key in ("rate_C", "current_mA"):
-        if key in values:
-            values[key] = sign * abs(values[key])
-    return aurora_unicycler.ConstantCurrent(**values)
 
 
 STEP_SPECS: dict[str, BuilderStepSpec] = {
@@ -462,16 +461,6 @@ STEP_SPECS: dict[str, BuilderStepSpec] = {
         key="constant_current",
         label="Constant Current",
         fields=(
-            BuilderFieldSpec(
-                "current_direction",
-                "Direction",
-                "charging",
-                parse_current_direction,
-                select_options=(
-                    BuilderSelectOption("charging", "Charging"),
-                    BuilderSelectOption("discharging", "Discharging"),
-                ),
-            ),
             BuilderFieldSpec("rate_C", "C-rate", "0.5", parse_optional_c_rate),
             _unit_field("current_mA", "Current", "", parse_optional_float, CURRENT_UNITS),
             _unit_field("until_time_s", "Max time", "10800", parse_optional_float, TIME_UNITS),
@@ -483,7 +472,7 @@ STEP_SPECS: dict[str, BuilderStepSpec] = {
                 VOLTAGE_UNITS,
             ),
         ),
-        builder=_build_constant_current,
+        builder=lambda params: aurora_unicycler.ConstantCurrent(**params),
         summary_builder=lambda params: _summary_from_parts(
             _constant_current_summary(params),
             f"until {_display_value(params, 'until_voltage_V', 'V')}"
@@ -653,16 +642,6 @@ def visual_steps_from_protocol_data(protocol_data: dict[str, Any]) -> list[dict[
                 step["loop_to_step"] = ""
             else:
                 raise ValueError("An imported Loop step has an invalid target.")
-        elif step_type == "constant_current":
-            signed_value = step.get("rate_C")
-            if signed_value is None:
-                signed_value = step.get("current_mA")
-            step["current_direction"] = (
-                "discharging" if signed_value is not None and signed_value < 0 else "charging"
-            )
-            for key in ("rate_C", "current_mA"):
-                if step.get(key) is not None:
-                    step[key] = abs(step[key])
         elif step_type == "impedance_spectroscopy":
             amplitude_v = step.pop("amplitude_V", None)
             amplitude_ma = step.pop("amplitude_mA", None)
