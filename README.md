@@ -9,7 +9,7 @@ A desktop editor for creating aurora unicycler based cycling protocols and expor
 3. Save the editable source and normalized protocol in a `.psmethod` package.
 4. Export PalmSens-compatible protocols as `.mscr` MethodSCRIPT files.
 
-Temperature steps can be saved in a package but cannot be exported to MethodSCRIPT because they require an external temperature controller implementation.
+For more documentation and step specifications see the aurora unicycler library. Temperature steps can be saved in a package but cannot be exported to MethodSCRIPT because they require an external temperature controller implementation.
 
 ## Features
 
