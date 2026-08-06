@@ -11,7 +11,6 @@ from aurora_unicycler.palmsens import PalmSensDevice
 
 
 PACKAGE_FORMAT = "palmsens_aurora_method_package"
-PACKAGE_VERSION = 2
 SUPPORTED_SOURCE_MODES = frozenset({"aurora_visual", "aurora_json"})
 
 
@@ -79,7 +78,6 @@ class AuroraMethodPackage:
     def to_dict(self) -> dict[str, Any]:
         return {
             "format": PACKAGE_FORMAT,
-            "version": PACKAGE_VERSION,
             "name": self.name,
             "source_mode": self.source_mode,
             "source_payload": self.source_payload,
@@ -90,8 +88,6 @@ class AuroraMethodPackage:
     def from_dict(cls, data: dict[str, Any]) -> "AuroraMethodPackage":
         if data.get("format") != PACKAGE_FORMAT:
             raise ValueError("Unsupported Aurora package format.")
-        if data.get("version") != PACKAGE_VERSION:
-            raise ValueError("Unsupported Aurora package version.")
         source_mode = data.get("source_mode", "aurora_visual")
         if source_mode not in SUPPORTED_SOURCE_MODES:
             raise ValueError(f"Unsupported Aurora source mode: {source_mode}")

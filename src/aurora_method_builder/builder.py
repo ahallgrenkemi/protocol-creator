@@ -409,15 +409,6 @@ STEP_SPECS: dict[str, BuilderStepSpec] = {
             _display_value(params, "until_time_s", "s")
         ),
     ),
-    "wait": BuilderStepSpec(
-        key="wait",
-        label="Wait",
-        fields=(_unit_field("until_time_s", "Duration", "60", parse_required_float, TIME_UNITS),),
-        builder=lambda params: aurora_unicycler.Wait(**params),
-        summary_builder=lambda params: _summary_from_parts(
-            _display_value(params, "until_time_s", "s")
-        ),
-    ),
     "temperature": BuilderStepSpec(
         key="temperature",
         label="Temperature",
@@ -591,7 +582,6 @@ STEP_SPECS: dict[str, BuilderStepSpec] = {
 STEP_ORDER = (
     "tag",
     "open_circuit_voltage",
-    "wait",
     "temperature",
     "constant_current",
     "constant_voltage",

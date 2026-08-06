@@ -15,7 +15,7 @@ For more documentation and step specifications see the aurora unicycler library.
 
 - Drag-and-drop visual editor with copying, reordering, unit conversion, imports, and loops.
 - JSON protocol editing.
-- Tag, open-circuit voltage, wait, temperature, constant-current, constant-voltage, voltage-scan, impedance-spectroscopy, and loop steps.
+- Tag, open-circuit voltage, temperature, constant-current, constant-voltage, voltage-scan, impedance-spectroscopy, and loop steps.
 - Open, import, and save `.psmethod` packages.
 - Configure the PalmSens target, sample capacity, EIS values, and additional measurements during export.
 
@@ -28,7 +28,6 @@ Every package written by the application has these top-level fields:
 | Field | Type | Description |
 | --- | --- | --- |
 | `format` | string | Package identifier. It must be `palmsens_aurora_method_package`. |
-| `version` | integer | Package schema version. The current version is `2`; unsupported versions are rejected when opened. |
 | `name` | string | Human-readable method name shown by the editor. |
 | `source_mode` | string | Editor used to create the method: `aurora_visual` or `aurora_json`. |
 | `source_payload` | object or string | Original editable content. Its structure depends on `source_mode`, as described below. |
@@ -51,7 +50,7 @@ Every package written by the application has these top-level fields:
 
 [Aurora Unicycler](https://github.com/EmpaEConversion/aurora-unicycler) provides the protocol models, validation, JSON conversion, and PalmSens MethodSCRIPT generation used by this application.
 
-This project currently depends on a pinned revision of the library, which adds the `Wait` and `Temperature` steps. The dependency is installed automatically from the URL in `pyproject.toml`.
+This project currently depends on a pinned revision of the library that includes temperature steps. The dependency is installed automatically from the URL in `pyproject.toml`.
 
 ## Run
 

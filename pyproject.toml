@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "PySide6",
-    "aurora-unicycler @ git+https://github.com/Laswer5/aurora-unicycler.git@b50252c79e8c314d79d7b73630af800d23adad26",
+    "aurora-unicycler @ git+https://github.com/Laswer5/aurora-unicycler.git@58a44602ea37671777ca0abafe6ef870291a6f0a",
 ]
 
 [project.gui-scripts]
