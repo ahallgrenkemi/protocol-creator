@@ -376,6 +376,18 @@ def _constant_current_summary(params: dict[str, Any]) -> str:
     return _summary_from_parts(_current_step_direction_summary(params), target)
 
 
+def _stop_voltage_summary(params: dict[str, Any]) -> str:
+    voltage = _display_value(params, "until_voltage_V", "V")
+    if not voltage:
+        return ""
+    reference = (
+        "WE vs CE"
+        if params.get("stop_voltage_reference") == "we_vs_ce"
+        else "WE vs RE"
+    )
+    return f"until {voltage} ({reference})"
+
+
 def _display_value(params: dict[str, Any], key: str, default_unit: str) -> str:
     value = params.get(key, "")
     if value in {None, ""}:
@@ -462,13 +474,21 @@ STEP_SPECS: dict[str, BuilderStepSpec] = {
                 parse_optional_float,
                 VOLTAGE_UNITS,
             ),
+            BuilderFieldSpec(
+                "stop_voltage_reference",
+                "Stop voltage reference",
+                "we_vs_re",
+                parse_required_text,
+                select_options=(
+                    BuilderSelectOption("we_vs_re", "WE vs RE"),
+                    BuilderSelectOption("we_vs_ce", "WE vs CE"),
+                ),
+            ),
         ),
         builder=lambda params: aurora_unicycler.ConstantCurrent(**params),
         summary_builder=lambda params: _summary_from_parts(
             _constant_current_summary(params),
-            f"until {_display_value(params, 'until_voltage_V', 'V')}"
-            if params.get("until_voltage_V")
-            else "",
+            _stop_voltage_summary(params),
             f"max {_display_value(params, 'until_time_s', 's')}"
             if params.get("until_time_s")
             else "",

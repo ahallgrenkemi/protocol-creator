@@ -164,7 +164,7 @@ def build_aurora_methodscript(
         sample_name=settings.sample_name,
         capacity_mAh=settings.capacity_mAh,
         device=PalmSensDevice(settings.device_key),
-        channel=0, # Konstig fix: Palmsensen hanterar kanalerna som egna enheter med en kanal
+        channel=0,  # PalmSens exposes each channel as a separate single-channel device.
         scan_step_voltage_V=settings.scan_step_voltage_v,
         eis_dc_potential_V=settings.eis_dc_potential_v,
         eis_dc_current_mA=settings.eis_dc_current_ma,
