@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Aurora Method Builder"
+abstract: "Desktop editor for creating Aurora Unicycler based battery cycling protocols and exporting them as PalmSens MethodSCRIPT."
+type: software
+version: 0.1.0
+date-released: "2026-08-08"
+license: MIT
+repository-code: "https://github.com/Interphases-Lab/protocol-creator"
+keywords: ["electrochemistry", "batteries", "palmsens", "methodscript", "cycling-protocol", "laboratory-automation"]
+authors: [{given-names: "Niklas", family-names: "Sundin", affiliation: "Uppsala University"}, {given-names: "Erik J.", family-names: "Berg", orcid: "https://orcid.org/0000-0001-5653-0383", affiliation: "Uppsala University"}]
