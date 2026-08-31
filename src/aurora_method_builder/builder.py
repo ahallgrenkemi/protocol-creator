@@ -79,6 +79,13 @@ def parse_optional_c_rate(raw_value: Any) -> float | None:
     return _coerce_c_rate(value) if value else None
 
 
+def parse_voltage_reference(raw_value: Any) -> str:
+    value = _as_text(raw_value)
+    if value not in {"we_vs_re", "we_vs_ce"}:
+        raise ValueError("Voltage reference must be we_vs_re or we_vs_ce.")
+    return value
+
+
 def parse_bool(raw_value: Any) -> bool:
     if isinstance(raw_value, bool):
         return raw_value
@@ -261,16 +268,13 @@ def _set_field_widget(field: BuilderFieldSpec, widget: FieldValueWidget, raw_val
 
 
 TIME_UNITS = (
-    BuilderUnitOption("s", "s"),
-    BuilderUnitOption("ms", "ms", 1e-3),
-    BuilderUnitOption("min", "min", 60.0),
     BuilderUnitOption("h", "h", 3600.0),
-    BuilderUnitOption("d", "d", 86400.0),
+    BuilderUnitOption("s", "s"),
+    BuilderUnitOption("min", "min", 60.0),
 )
 VOLTAGE_UNITS = (
     BuilderUnitOption("V", "V"),
     BuilderUnitOption("mV", "mV", 1e-3),
-    BuilderUnitOption("uV", "µV", 1e-6),
 )
 CURRENT_UNITS = (
     BuilderUnitOption("mA", "mA"),
@@ -278,9 +282,8 @@ CURRENT_UNITS = (
     BuilderUnitOption("A", "A", 1e3),
 )
 EIS_AMPLITUDE_UNITS = (
-    BuilderUnitOption("V", "V", aurora_field="amplitude_V"),
     BuilderUnitOption("mV", "mV", 1e-3, aurora_field="amplitude_V"),
-    BuilderUnitOption("uV", "µV", 1e-6, aurora_field="amplitude_V"),
+    BuilderUnitOption("V", "V", aurora_field="amplitude_V"),
     BuilderUnitOption("mA", "mA", aurora_field="amplitude_mA"),
     BuilderUnitOption("uA", "µA", 1e-3, aurora_field="amplitude_mA"),
     BuilderUnitOption("A", "A", 1e3, aurora_field="amplitude_mA"),
@@ -386,6 +389,14 @@ def _stop_voltage_summary(params: dict[str, Any]) -> str:
         else "WE vs RE"
     )
     return f"until {voltage} ({reference})"
+
+
+def _voltage_reference_summary(params: dict[str, Any], key: str = "voltage_reference") -> str:
+    voltage = _display_value(params, "voltage_V", "V")
+    if not voltage:
+        return ""
+    reference = "WE vs CE" if params.get(key) == "we_vs_ce" else "WE vs RE"
+    return f"{voltage} ({reference})"
 
 
 def _display_value(params: dict[str, Any], key: str, default_unit: str) -> str:
@@ -507,6 +518,16 @@ STEP_SPECS: dict[str, BuilderStepSpec] = {
         label="Constant Voltage",
         fields=(
             _unit_field("voltage_V", "Voltage", "4.2", parse_required_float, VOLTAGE_UNITS),
+            BuilderFieldSpec(
+                "voltage_reference",
+                "Voltage reference",
+                "we_vs_re",
+                parse_voltage_reference,
+                select_options=(
+                    BuilderSelectOption("we_vs_re", "WE vs RE"),
+                    BuilderSelectOption("we_vs_ce", "WE vs CE"),
+                ),
+            ),
             _unit_field("until_time_s", "Max time", "3600", parse_optional_float, TIME_UNITS),
             BuilderFieldSpec("until_rate_C", "Stop at rate (C)", "0.05", parse_optional_c_rate),
             _unit_field(
@@ -519,7 +540,7 @@ STEP_SPECS: dict[str, BuilderStepSpec] = {
         ),
         builder=lambda params: aurora_unicycler.ConstantVoltage(**params),
         summary_builder=lambda params: _summary_from_parts(
-            _display_value(params, "voltage_V", "V"),
+            _voltage_reference_summary(params),
             f"until {params.get('until_rate_C', '')} C" if params.get("until_rate_C") else "",
             f"until {_display_value(params, 'until_current_mA', 'mA')}"
             if params.get("until_current_mA")
@@ -565,14 +586,14 @@ STEP_SPECS: dict[str, BuilderStepSpec] = {
             ),
             _unit_field(
                 "start_frequency_Hz",
-                "Start frequency",
+                "Max frequency",
                 "10000",
                 parse_required_float,
                 FREQUENCY_UNITS,
             ),
             _unit_field(
                 "end_frequency_Hz",
-                "End frequency",
+                "Min frequency",
                 "0.1",
                 parse_required_float,
                 FREQUENCY_UNITS,
@@ -600,21 +621,21 @@ STEP_SPECS: dict[str, BuilderStepSpec] = {
 }
 
 STEP_ORDER = (
-    "tag",
     "open_circuit_voltage",
     "temperature",
     "constant_current",
     "constant_voltage",
-    "voltage_scan",
     "impedance_spectroscopy",
+    "voltage_scan",
     "loop",
+    "tag",
 )
 
 
 def default_visual_builder_data() -> dict[str, Any]:
     return {
-        "globals": {"temperature_ramp_rate": ""},
-        "record": {"time_s": "", "voltage_V": "", "current_mA": ""},
+        "globals": {"temperature_ramp_rate": "0.7"},
+        "record": {"time_s": "1", "voltage_V": "", "current_mA": ""},
         "safety": {
             "max_voltage_V": "",
             "min_voltage_V": "",
@@ -893,8 +914,8 @@ class AuroraStepCard(QFrame):
 
     def _build_loop_fields(self, raw_values: dict[str, Any]):
         self.loop_target_mode = NoScrollComboBox(self)
-        self.loop_target_mode.addItem("Tag", "tag")
         self.loop_target_mode.addItem("Step number", "step")
+        self.loop_target_mode.addItem("Tag", "tag")
         raw_mode = _as_text(raw_values.get("loop_to_mode", "tag")) or "tag"
         self.loop_target_mode.setCurrentIndex(1 if raw_mode == "step" else 0)
         self.loop_target_mode.currentIndexChanged.connect(self._on_loop_mode_changed)
