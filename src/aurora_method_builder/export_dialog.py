@@ -60,12 +60,6 @@ class AuroraMethodScriptExportDialog(QDialog):
         self.scan_step_edit = QLineEdit(self)
         form.addRow("Scan step voltage (V)", self.scan_step_edit)
 
-        self.eis_dc_potential_edit = QLineEdit("0.0", self)
-        form.addRow("EIS DC potential (V)", self.eis_dc_potential_edit)
-
-        self.eis_dc_current_edit = QLineEdit("0.0", self)
-        form.addRow("EIS DC current (mA)", self.eis_dc_current_edit)
-
         extra_measurements_label = QLabel("Extra measurements", self)
         extra_measurements_label.setObjectName("auroraCardTitle")
         layout.addWidget(extra_measurements_label)
@@ -118,14 +112,6 @@ class AuroraMethodScriptExportDialog(QDialog):
             scan_step_voltage_v=self._optional_float(
                 self.scan_step_edit,
                 "Scan step voltage (V)",
-            ),
-            eis_dc_potential_v=self._float(
-                self.eis_dc_potential_edit,
-                "EIS DC potential (V)",
-            ),
-            eis_dc_current_ma=self._float(
-                self.eis_dc_current_edit,
-                "EIS DC current (mA)",
             ),
             additional_measurements=tuple(
                 var_type

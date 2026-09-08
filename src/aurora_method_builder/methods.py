@@ -63,8 +63,6 @@ class AuroraExportSettings:
     device_key: str
     channel: int
     scan_step_voltage_v: float | None
-    eis_dc_potential_v: float
-    eis_dc_current_ma: float
     additional_measurements: tuple[str, ...]
 
 
@@ -166,8 +164,6 @@ def build_aurora_methodscript(
         device=PalmSensDevice(settings.device_key),
         channel=0,  # PalmSens exposes each channel as a separate single-channel device.
         scan_step_voltage_V=settings.scan_step_voltage_v,
-        eis_dc_potential_V=settings.eis_dc_potential_v,
-        eis_dc_current_mA=settings.eis_dc_current_ma,
         additional_measurements=settings.additional_measurements,
     )
 

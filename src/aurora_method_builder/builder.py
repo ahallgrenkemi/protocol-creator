@@ -12,6 +12,7 @@ from PySide6.QtGui import QDrag, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
+    QCheckBox,
     QFormLayout,
     QFrame,
     QGridLayout,
@@ -77,13 +78,6 @@ def parse_required_text(raw_value: Any) -> str:
 def parse_optional_c_rate(raw_value: Any) -> float | None:
     value = _as_text(raw_value)
     return _coerce_c_rate(value) if value else None
-
-
-def parse_voltage_reference(raw_value: Any) -> str:
-    value = _as_text(raw_value)
-    if value not in {"we_vs_re", "we_vs_ce"}:
-        raise ValueError("Voltage reference must be we_vs_re or we_vs_ce.")
-    return value
 
 
 def parse_bool(raw_value: Any) -> bool:
@@ -268,9 +262,9 @@ def _set_field_widget(field: BuilderFieldSpec, widget: FieldValueWidget, raw_val
 
 
 TIME_UNITS = (
-    BuilderUnitOption("h", "h", 3600.0),
     BuilderUnitOption("s", "s"),
     BuilderUnitOption("min", "min", 60.0),
+    BuilderUnitOption("h", "h", 3600.0),
 )
 VOLTAGE_UNITS = (
     BuilderUnitOption("V", "V"),
@@ -389,14 +383,6 @@ def _stop_voltage_summary(params: dict[str, Any]) -> str:
         else "WE vs RE"
     )
     return f"until {voltage} ({reference})"
-
-
-def _voltage_reference_summary(params: dict[str, Any], key: str = "voltage_reference") -> str:
-    voltage = _display_value(params, "voltage_V", "V")
-    if not voltage:
-        return ""
-    reference = "WE vs CE" if params.get(key) == "we_vs_ce" else "WE vs RE"
-    return f"{voltage} ({reference})"
 
 
 def _display_value(params: dict[str, Any], key: str, default_unit: str) -> str:
@@ -518,16 +504,6 @@ STEP_SPECS: dict[str, BuilderStepSpec] = {
         label="Constant Voltage",
         fields=(
             _unit_field("voltage_V", "Voltage", "4.2", parse_required_float, VOLTAGE_UNITS),
-            BuilderFieldSpec(
-                "voltage_reference",
-                "Voltage reference",
-                "we_vs_re",
-                parse_voltage_reference,
-                select_options=(
-                    BuilderSelectOption("we_vs_re", "WE vs RE"),
-                    BuilderSelectOption("we_vs_ce", "WE vs CE"),
-                ),
-            ),
             _unit_field("until_time_s", "Max time", "3600", parse_optional_float, TIME_UNITS),
             BuilderFieldSpec("until_rate_C", "Stop at rate (C)", "0.05", parse_optional_c_rate),
             _unit_field(
@@ -540,7 +516,7 @@ STEP_SPECS: dict[str, BuilderStepSpec] = {
         ),
         builder=lambda params: aurora_unicycler.ConstantVoltage(**params),
         summary_builder=lambda params: _summary_from_parts(
-            _voltage_reference_summary(params),
+            _display_value(params, "voltage_V", "V"),
             f"until {params.get('until_rate_C', '')} C" if params.get("until_rate_C") else "",
             f"until {_display_value(params, 'until_current_mA', 'mA')}"
             if params.get("until_current_mA")
@@ -581,41 +557,34 @@ STEP_SPECS: dict[str, BuilderStepSpec] = {
         key="impedance_spectroscopy",
         label="Impedance Spectroscopy",
         fields=(
-            _unit_field(
-                "amplitude", "Amplitude", "0.01", parse_optional_float, EIS_AMPLITUDE_UNITS
-            ),
+            _unit_field("amplitude_V", "Amplitude", "0.01", parse_optional_float, VOLTAGE_UNITS),
+            _unit_field("amplitude_mA", "Amplitude", "1", parse_optional_float, CURRENT_UNITS),
+            _unit_field("dc_potential_V", "DC potential", "0", parse_optional_float, VOLTAGE_UNITS),
+            _unit_field("dc_current_mA", "DC current", "0", parse_optional_float, CURRENT_UNITS),
             _unit_field(
                 "start_frequency_Hz",
-                "Max frequency",
+                "Start frequency",
                 "10000",
                 parse_required_float,
                 FREQUENCY_UNITS,
             ),
             _unit_field(
                 "end_frequency_Hz",
-                "Min frequency",
+                "End frequency",
                 "0.1",
                 parse_required_float,
                 FREQUENCY_UNITS,
             ),
             BuilderFieldSpec("points_per_decade", "Points per decade", "10", parse_required_int),
             BuilderFieldSpec("measures_per_point", "Measures per point", "1", parse_required_int),
-            BuilderFieldSpec(
-                "drift_correction",
-                "Drift correction",
-                False,
-                parse_bool,
-                select_options=(
-                    BuilderSelectOption(False, "No"),
-                    BuilderSelectOption(True, "Yes"),
-                ),
-            ),
+            BuilderFieldSpec("dc_vs_ocv", "Use OCV as DC setting", True, parse_bool),
         ),
         builder=lambda params: aurora_unicycler.ImpedanceSpectroscopy(**params),
         summary_builder=lambda params: _summary_from_parts(
             f"{_display_value(params, 'start_frequency_Hz', 'Hz')} -> "
             f"{_display_value(params, 'end_frequency_Hz', 'Hz')}",
-            _display_value(params, "amplitude", "V"),
+            _display_value(params, "amplitude_V", "V")
+            or _display_value(params, "amplitude_mA", "mA"),
         ),
     ),
 }
@@ -676,12 +645,16 @@ def visual_steps_from_protocol_data(protocol_data: dict[str, Any]) -> list[dict[
         elif step_type == "impedance_spectroscopy":
             amplitude_v = step.pop("amplitude_V", None)
             amplitude_ma = step.pop("amplitude_mA", None)
-            if amplitude_ma is not None:
-                step["amplitude"] = amplitude_ma
-                step["amplitude_unit"] = "mA"
+            if amplitude_v is None and amplitude_ma is None and "amplitude" in step:
+                legacy_amplitude = step.pop("amplitude")
+                legacy_unit = step.pop("amplitude_unit", "V")
+                if legacy_unit in {"mA", "uA", "A"}:
+                    step["amplitude_mA"] = legacy_amplitude
+                else:
+                    step["amplitude_V"] = legacy_amplitude
             else:
-                step["amplitude"] = amplitude_v
-                step["amplitude_unit"] = "V"
+                step["amplitude_V"] = amplitude_v
+                step["amplitude_mA"] = amplitude_ma
 
         visual_steps.append(step)
 
@@ -851,15 +824,25 @@ class AuroraStepCard(QFrame):
         layout.addWidget(self.form_widget)
 
         if raw_values is None:
-            raw_values = (
-                {"cycle_count": ""}
-                if self.step_type == "loop"
-                else {
+            if self.step_type == "loop":
+                raw_values = {"cycle_count": ""}
+            elif self.step_type == "impedance_spectroscopy":
+                raw_values = {
+                    "eis_mode": "peis",
+                    "amplitude_V": "0.01",
+                    "amplitude_mA": "1",
+                    "dc_potential_V": "0",
+                    "dc_current_mA": "0",
+                    "dc_vs_ocv": True,
+                    "points_per_decade": "10",
+                    "measures_per_point": "1",
+                }
+            else:
+                raw_values = {
                     field.key: ""
                     for field in STEP_SPECS[self.step_type].fields
                     if not field.select_options
                 }
-            )
 
         if self.step_type == "loop":
             self._build_loop_fields(raw_values)
@@ -878,6 +861,10 @@ class AuroraStepCard(QFrame):
         self.drag_ended.emit(self, result == Qt.DropAction.MoveAction)
 
     def _build_generic_fields(self, raw_values: dict[str, Any]):
+        if self.step_type == "impedance_spectroscopy":
+            self._build_eis_fields(raw_values)
+            return
+
         spec = STEP_SPECS[self.step_type]
         if spec.field_choice is not None:
             self.field_choice_widget = NoScrollComboBox(self)
@@ -911,6 +898,96 @@ class AuroraStepCard(QFrame):
         for field, display_widget in editors:
             if field.key not in choice_fields:
                 self._add_compact_field(field.label, display_widget)
+
+    def _build_eis_fields(self, raw_values: dict[str, Any]):
+        self.eis_mode_widget = NoScrollComboBox(self)
+        self.eis_mode_widget.addItem("PEIS", "peis")
+        self.eis_mode_widget.addItem("GEIS", "geis")
+        mode = "peis" if raw_values.get("eis_mode") == "peis" else (
+            "peis" if _as_text(raw_values.get("amplitude_V")) else "geis"
+        )
+        self.eis_mode_widget.setCurrentIndex(self.eis_mode_widget.findData(mode))
+        self.eis_mode_widget.currentIndexChanged.connect(self._on_eis_mode_changed)
+        self._add_compact_field("EIS mode", self.eis_mode_widget)
+
+        self.eis_value_widgets: dict[str, FieldValueWidget] = {}
+        self.eis_unit_widgets: dict[str, QComboBox] = {}
+        amplitude_displays = []
+        for field_key in ("amplitude_V", "amplitude_mA"):
+            field = next(item for item in STEP_SPECS[self.step_type].fields if item.key == field_key)
+            value_widget, display_widget, unit_widget = _create_field_editor(
+                field, raw_values, self, self._on_field_changed
+            )
+            self.eis_value_widgets[field_key] = value_widget
+            if unit_widget is not None:
+                self.eis_unit_widgets[field_key] = unit_widget
+            amplitude_displays.append(display_widget)
+        self.eis_amplitude_stack = QStackedWidget(self)
+        for display_widget in amplitude_displays:
+            self.eis_amplitude_stack.addWidget(display_widget)
+        self._add_compact_field("Amplitude", self.eis_amplitude_stack)
+
+        dc_displays = []
+        for field_key in ("dc_potential_V", "dc_current_mA"):
+            field = next(item for item in STEP_SPECS[self.step_type].fields if item.key == field_key)
+            value_widget, display_widget, unit_widget = _create_field_editor(
+                field, raw_values, self, self._on_field_changed
+            )
+            self.eis_value_widgets[field_key] = value_widget
+            if unit_widget is not None:
+                self.eis_unit_widgets[field_key] = unit_widget
+            dc_displays.append(display_widget)
+        self.eis_dc_stack = QStackedWidget(self)
+        for display_widget in dc_displays:
+            self.eis_dc_stack.addWidget(display_widget)
+        self.eis_dc_label = self._add_compact_field("DC potential", self.eis_dc_stack)
+
+        self.eis_frequency_widgets: dict[str, FieldValueWidget] = {}
+        self.eis_frequency_unit_widgets: dict[str, QComboBox] = {}
+        for field_key in ("start_frequency_Hz", "end_frequency_Hz"):
+            field = next(
+                item for item in STEP_SPECS[self.step_type].fields if item.key == field_key
+            )
+            value_widget, display_widget, unit_widget = _create_field_editor(
+                field, raw_values, self, self._on_field_changed
+            )
+            self.eis_frequency_widgets[field_key] = value_widget
+            if unit_widget is not None:
+                self.eis_frequency_unit_widgets[field_key] = unit_widget
+            self._add_compact_field(field.label, display_widget)
+
+        self.eis_dc_vs_ocv_widget = QCheckBox("Use OCV as DC setting", self)
+        self.eis_dc_vs_ocv_widget.setChecked(parse_bool(raw_values.get("dc_vs_ocv", True)))
+        self.eis_dc_vs_ocv_widget.toggled.connect(self._on_field_changed)
+        self._add_compact_field("", self.eis_dc_vs_ocv_widget)
+
+        self.eis_points_widget = QLineEdit(
+            _as_text(raw_values.get("points_per_decade", "10")),
+            self,
+        )
+        self.eis_points_widget.textChanged.connect(self._on_field_changed)
+        self._add_compact_field("Points per decade", self.eis_points_widget)
+
+        self.eis_measures_widget = QLineEdit(
+            _as_text(raw_values.get("measures_per_point", "1")),
+            self,
+        )
+        self.eis_measures_widget.textChanged.connect(self._on_field_changed)
+        self._add_compact_field("Measures per point", self.eis_measures_widget)
+        self._update_eis_mode()
+
+    def _on_eis_mode_changed(self, *_args):
+        self._update_eis_mode()
+        self._on_field_changed()
+
+    def _update_eis_mode(self):
+        is_geis = self.eis_mode_widget.currentData() == "geis"
+        self.eis_amplitude_stack.setCurrentIndex(1 if is_geis else 0)
+        self.eis_dc_stack.setCurrentIndex(1 if is_geis else 0)
+        self.eis_dc_label.setText("DC current" if is_geis else "DC potential")
+        self.eis_dc_vs_ocv_widget.setEnabled(not is_geis)
+        if is_geis:
+            self.eis_dc_vs_ocv_widget.setChecked(False)
 
     def _build_loop_fields(self, raw_values: dict[str, Any]):
         self.loop_target_mode = NoScrollComboBox(self)
@@ -1015,6 +1092,45 @@ class AuroraStepCard(QFrame):
                 "loop_to_step": self.loop_target_step.text().strip(),
                 "cycle_count": self.loop_cycle_count.text().strip(),
             }
+
+        if self.step_type == "impedance_spectroscopy":
+            mode = self.eis_mode_widget.currentData()
+            values = {
+                "step": self.step_type,
+                "eis_mode": mode,
+                "amplitude_V": "",
+                "amplitude_mA": "",
+                "dc_potential_V": "",
+                "dc_current_mA": "",
+                "start_frequency_Hz": "",
+                "end_frequency_Hz": "",
+                "dc_vs_ocv": self.eis_dc_vs_ocv_widget.isChecked(),
+                "points_per_decade": self.eis_points_widget.text().strip(),
+                "measures_per_point": self.eis_measures_widget.text().strip(),
+            }
+            active_amplitude = "amplitude_mA" if mode == "geis" else "amplitude_V"
+            active_dc = "dc_current_mA" if mode == "geis" else "dc_potential_V"
+            values[active_amplitude] = _read_field_widget(
+                next(field for field in STEP_SPECS[self.step_type].fields if field.key == active_amplitude),
+                self.eis_value_widgets[active_amplitude],
+            )
+            values[active_dc] = _read_field_widget(
+                next(field for field in STEP_SPECS[self.step_type].fields if field.key == active_dc),
+                self.eis_value_widgets[active_dc],
+            )
+            for field_key in (active_amplitude, active_dc):
+                field = next(field for field in STEP_SPECS[self.step_type].fields if field.key == field_key)
+                if field.unit_options:
+                    values[field.unit_key] = self.eis_unit_widgets[field_key].currentData()
+            for field_key in ("start_frequency_Hz", "end_frequency_Hz"):
+                field = next(field for field in STEP_SPECS[self.step_type].fields if field.key == field_key)
+                values[field_key] = _read_field_widget(
+                    field,
+                    self.eis_frequency_widgets[field_key],
+                )
+                if field.unit_options:
+                    values[field.unit_key] = self.eis_frequency_unit_widgets[field_key].currentData()
+            return values
 
         values = {"step": self.step_type}
         spec = STEP_SPECS[self.step_type]
