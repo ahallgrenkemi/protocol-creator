@@ -327,6 +327,7 @@ SAFETY_FIELDS: tuple[BuilderFieldSpec, ...] = (
 )
 
 GLOBAL_FIELDS: tuple[BuilderFieldSpec, ...] = (
+    _unit_field("eis_equilibration_time", "EIS equilibration time", "0", parse_optional_float, TIME_UNITS),
     _unit_field(
         "temperature_ramp_rate",
         "Temperature ramp rate",
@@ -724,6 +725,8 @@ def build_protocol_from_visual_data(
         if spec.field_choice is not None:
             raw_step = spec.field_choice.selected_values(raw_step)
         params = _clean_none_values(_parse_fields(spec.fields, raw_step))
+        if step_type == "impedance_spectroscopy":
+            params["equilibration_time_s"] = global_values.get("eis_equilibration_time") or 0.0
         if step_type == "temperature" and "ramp_rate" not in params:
             global_ramp_rate = global_values["temperature_ramp_rate"]
             if global_ramp_rate is None:
